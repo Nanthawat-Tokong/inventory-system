@@ -43,6 +43,32 @@ describe('ภาพรวม', () => {
   });
 });
 
+describe('รายวัน / รายสัปดาห์ / รายเดือน', () => {
+  it('ทุกแบบรวมแล้วได้ยอดเท่ากับภาพรวม (รับ 53, ออก 15)', async () => {
+    for (const g of ['day', 'week', 'month']) {
+      const r = (await api(t.admin, 'GET', `/reports/periodic?${range}&group=${g}`)).body;
+      assert.equal(r.group, g);
+      assert.equal(r.periods.reduce((a, x) => a + x.received, 0), 53, g);
+      assert.equal(r.periods.reduce((a, x) => a + x.issued, 0), 15, g);
+      assert.equal(r.detail.reduce((a, x) => a + x.received, 0), 53, `${g} detail`);
+    }
+  });
+  it('รายสัปดาห์: ช่วงเริ่มเป็นวันจันทร์เสมอ / รายเดือน: วันที่ 1', async () => {
+    const w = (await api(t.admin, 'GET', `/reports/periodic?${range}&group=week`)).body.periods;
+    assert.ok(w.every((x) => new Date(`${x.period}T00:00:00`).getDay() === 1));
+    const m = (await api(t.admin, 'GET', `/reports/periodic?${range}&group=month`)).body.periods;
+    assert.ok(m.every((x) => x.period.endsWith('-01')));
+  });
+  it('/reports/daily, /weekly, /monthly (ตามเอกสาร API) ใช้ได้ และมีข้อมูลของวันนี้', async () => {
+    for (const p of ['daily', 'weekly', 'monthly']) {
+      const r = await api(t.cnxStaff, 'GET', `/reports/${p}`);
+      assert.equal(r.status, 200, p);
+      assert.equal(r.body.branch_id, B.CNX, 'สาขาเห็นแค่ของตัวเอง');
+      assert.ok(r.body.periods.length >= 1, p);
+    }
+  });
+});
+
 describe('ความเคลื่อนไหว', () => {
   it('คงเหลือ = ยกมา + รับ − ออก และตรงกับสต๊อกจริงทุกแถว', async () => {
     const rows = (await api(t.admin, 'GET', `/reports/movement?${range}`)).body.rows;

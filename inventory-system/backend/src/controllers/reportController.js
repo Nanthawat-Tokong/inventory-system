@@ -340,4 +340,53 @@ const byUser = handle(async (r, branchId, req) => {
   };
 });
 
-module.exports = { summary, movement, top, reorder, requisitions, byUser };
+// ─── periodic: รายงานรายวัน / รายสัปดาห์ / รายเดือน ────────────────
+// GET /reports/periodic?group=day|week|month&from&to&branch_id
+// สรุปรับเข้า/ออกต่อช่วงเวลา + รายละเอียดต่อสินค้า×สาขาในแต่ละช่วง
+//   week  = จันทร์–อาทิตย์ (period = วันจันทร์ของสัปดาห์), month = ทั้งเดือน (period = วันที่ 1)
+const GROUP_SQL = {
+  day: "DATE_FORMAT(t.created_at, '%Y-%m-%d')",
+  week: "DATE_FORMAT(DATE_SUB(DATE(t.created_at), INTERVAL WEEKDAY(t.created_at) DAY), '%Y-%m-%d')",
+  month: "DATE_FORMAT(t.created_at, '%Y-%m-01')",
+};
+const periodicData = async (r, branchId, group) => {
+  const g = GROUP_SQL[group] ? group : 'day';
+  const b = branchSql('t.branch_id', branchId);
+  const [periods] = await pool.query(`
+    SELECT ${GROUP_SQL[g]} AS period, COUNT(*) AS tx_count,
+      SUM(IF(t.type = 'receive', t.quantity, 0)) AS received,
+      SUM(IF(t.type = 'issue', t.quantity, 0)) AS issued,
+      COUNT(DISTINCT t.product_id) AS products
+    FROM transactions t WHERE t.created_at >= ? AND t.created_at < ? ${b.sql}
+    GROUP BY period ORDER BY period
+  `, [r.start, r.endEx, ...b.params]);
+  const [detail] = await pool.query(`
+    SELECT ${GROUP_SQL[g]} AS period, p.id AS product_id, p.name AS product_name, p.sku, p.unit,
+      br.id AS branch_id, br.name AS branch_name,
+      SUM(IF(t.type = 'receive', t.quantity, 0)) AS received,
+      SUM(IF(t.type = 'issue', t.quantity, 0)) AS issued
+    FROM transactions t
+    JOIN products p ON p.id = t.product_id
+    JOIN branches br ON br.id = t.branch_id
+    WHERE t.created_at >= ? AND t.created_at < ? ${b.sql}
+    GROUP BY period, p.id, br.id ORDER BY period DESC, p.name
+  `, [r.start, r.endEx, ...b.params]);
+  const n = (x) => ({ ...x, received: Number(x.received), issued: Number(x.issued), net: Number(x.received) - Number(x.issued) });
+  return { group: g, periods: periods.map((x) => ({ ...n(x), tx_count: Number(x.tx_count), products: Number(x.products) })), detail: detail.map(n) };
+};
+const periodic = handle((r, branchId, req) => periodicData(r, branchId, req.query.group));
+
+// ทางลัดตามเอกสาร API เดิม: วันนี้ / สัปดาห์นี้ (จันทร์–วันนี้) / เดือนนี้
+const shortcut = (group) => async (req, res) => {
+  const d = new Date();
+  const start = group === 'day' ? d
+    : group === 'week' ? new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7))
+    : new Date(d.getFullYear(), d.getMonth(), 1);
+  req.query = { ...req.query, from: ymd(start), to: ymd(d), group };
+  return periodic(req, res);
+};
+const daily = shortcut('day');
+const weekly = shortcut('week');
+const monthly = shortcut('month');
+
+module.exports = { summary, movement, top, reorder, requisitions, byUser, periodic, daily, weekly, monthly };

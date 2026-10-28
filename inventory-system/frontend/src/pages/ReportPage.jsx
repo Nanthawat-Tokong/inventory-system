@@ -20,6 +20,7 @@ const C_OUT = "#eb6834";
 
 const TABS = [
   ["summary", "ภาพรวม"],
+  ["periodic", "รายวัน / รายสัปดาห์ / รายเดือน"],
   ["movement", "ความเคลื่อนไหวสต๊อก"],
   ["top", "ออกมาก / ค้างสต๊อก"],
   ["reorder", "ควรสั่งเพิ่ม"],
@@ -31,12 +32,21 @@ const pad = (n) => String(n).padStart(2, "0");
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const PRESETS = [
+  ["วันนี้", () => [new Date(), new Date()]],
+  ["สัปดาห์นี้", () => { const t = new Date(); return [addDays(t, -((t.getDay() + 6) % 7)), t]; }],
   ["7 วัน", () => [addDays(new Date(), -6), new Date()]],
   ["30 วัน", () => [addDays(new Date(), -29), new Date()]],
   ["90 วัน", () => [addDays(new Date(), -89), new Date()]],
   ["เดือนนี้", () => { const t = new Date(); return [new Date(t.getFullYear(), t.getMonth(), 1), t]; }],
   ["เดือนก่อน", () => { const t = new Date(); return [new Date(t.getFullYear(), t.getMonth() - 1, 1), new Date(t.getFullYear(), t.getMonth(), 0)]; }],
 ];
+// ค่าสูงสุดของแกน Y ให้แบ่ง 4 ช่องได้เป็นเลขกลมๆ (1, 2, 2.5, 5 × 10ⁿ) — แกนจะได้อ่านง่าย เช่น 0/20/40/60/80
+const niceTop = (max) => {
+  const raw = Math.max(1, max) / 4;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((x) => x >= raw);
+  return Math.max(4, step * 4);
+};
 const fmt = (n) => (n == null ? "-" : Number(n).toLocaleString("th-TH"));
 const thDate = (s) => new Date(s).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
@@ -66,6 +76,7 @@ export default function ReportPage() {
   const [from, setFrom] = useState(ymd(addDays(new Date(), -29)));
   const [to, setTo] = useState(ymd(new Date()));
   const [branchId, setBranchId] = useState("");
+  const [group, setGroup] = useState(() => new URLSearchParams(window.location.search).get("group") || "day");
   const [branches, setBranches] = useState([]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -80,12 +91,13 @@ export default function ReportPage() {
     let cancelled = false;
     const params = new URLSearchParams({ from, to });
     if (branchId) params.set("branch_id", branchId);
+    if (tab === "periodic") params.set("group", group);
     api.get(`/reports/${tab}?${params}`)
       .then((res) => { if (!cancelled) { setData(res.data); setError(""); } })
       .catch((err) => { if (!cancelled) { setData(null); setError(err.response?.data?.message || "โหลดรายงานไม่สำเร็จ"); } })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [tab, from, to, branchId]);
+  }, [tab, from, to, branchId, group]);
 
   // ทุกครั้งที่เปลี่ยนตัวกรอง แสดง "กำลังโหลด" ก่อน effect ด้านบนดึงข้อมูลใหม่
   const change = (fn) => (v) => { setLoading(true); fn(v); };
@@ -143,6 +155,10 @@ export default function ReportPage() {
         ) : (
           <>
             {tab === "summary" && <SummaryReport d={data} />}
+            {tab === "periodic" && data.periods && (
+              <PeriodicReport d={data} fileTag={fileTag} showBranch={isWarehouseSide && !branchId}
+                onGroup={(g) => { if (g !== group) { setLoading(true); setGroup(g); } }} />
+            )}
             {tab === "movement" && <MovementReport d={data} fileTag={fileTag} showBranch={isWarehouseSide && !branchId} />}
             {tab === "top" && <TopReport d={data} fileTag={fileTag} showBranch={isWarehouseSide && !branchId} />}
             {tab === "reorder" && <ReorderReport d={data} fileTag={fileTag} showBranch={isWarehouseSide && !branchId} />}
@@ -311,9 +327,8 @@ function DailyChart({ daily, from, to }) {
 
   const W = 900, H = 260, L = 48, R = 8, T = 12, B = 28;
   const max = Math.max(1, ...days.map((x) => Math.max(x.received, x.issued)));
-  const step = Math.pow(10, Math.floor(Math.log10(max)));
-  const niceMax = Math.ceil(max / step) * step;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(niceMax * f));
+  const niceMax = niceTop(max);
+  const ticks = [0, 1, 2, 3, 4].map((i) => (niceMax / 4) * i);
   const colW = (W - L - R) / days.length;
   const barW = Math.max(1, Math.min(14, (colW - 4) / 2));
   const y = (v) => T + (H - T - B) * (1 - v / niceMax);
@@ -635,5 +650,177 @@ function ByUserReport({ d, fileTag, mine }) {
         />
       </Card>
     </>
+  );
+}
+
+// ─── รายวัน / รายสัปดาห์ / รายเดือน ───────────────────────────
+const GROUPS = [["day", "รายวัน"], ["week", "รายสัปดาห์"], ["month", "รายเดือน"]];
+const TH_MONTH = (k) => new Date(`${k}T00:00:00`).toLocaleDateString("th-TH", { month: "long", year: "numeric" });
+const periodLabel = (k, g) => {
+  if (g === "month") return TH_MONTH(k);
+  if (g === "week") {
+    const a = new Date(`${k}T00:00:00`);
+    return `${a.toLocaleDateString("th-TH", { day: "numeric", month: "short" })} – ${addDays(a, 6).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" })}`;
+  }
+  return thDate(`${k}T00:00:00`);
+};
+// ทุกช่วงเวลาในช่วงวันที่ที่เลือก (ช่วงที่ไม่มีความเคลื่อนไหวก็แสดงเป็น 0 กราฟจะได้ไม่หลอกตา)
+const allPeriods = (from, to, g) => {
+  const [fy, fm, fd] = from.split("-").map(Number), [ty, tm, td] = to.split("-").map(Number);
+  let d = new Date(fy, fm - 1, fd); const end = new Date(ty, tm - 1, td); const out = [];
+  if (g === "week") d = addDays(d, -((d.getDay() + 6) % 7));
+  if (g === "month") d = new Date(d.getFullYear(), d.getMonth(), 1);
+  while (d <= end && out.length < 400) {
+    out.push(ymd(d));
+    d = g === "day" ? addDays(d, 1) : g === "week" ? addDays(d, 7) : new Date(d.getFullYear(), d.getMonth() + 1, 1);
+  }
+  return out;
+};
+
+function PeriodicReport({ d, fileTag, showBranch, onGroup }) {
+  const g = d.group;
+  const [picked, setPicked] = useState("");
+  const map = new Map(d.periods.map((x) => [x.period, x]));
+  const rows = allPeriods(d.range.from, d.range.to, g).map((k) => map.get(k) || { period: k, received: 0, issued: 0, net: 0, tx_count: 0, products: 0 });
+  const tot = rows.reduce((a, x) => ({ received: a.received + x.received, issued: a.issued + x.issued }), { received: 0, issued: 0 });
+  const detail = picked ? d.detail.filter((x) => x.period === picked) : [];
+  const label = GROUPS.find(([k]) => k === g)[1];
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2 mb-4 print:hidden">
+        <span className="text-sm text-gray-600">ดูแบบ:</span>
+        {GROUPS.map(([k, l]) => (
+          <button key={k} onClick={() => { setPicked(""); onGroup(k); }}
+            className={`px-4 py-1.5 rounded-full text-sm border ${g === k ? "bg-blue-600 text-white border-blue-600" : "bg-white hover:bg-gray-50"}`}>{l}</button>
+        ))}
+        <span className="text-xs text-gray-500">เลือกช่วงวันที่ด้านบน เช่น “เดือนนี้” + “รายวัน” = ดูทีละวันของเดือนนี้</span>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <Stat label={`จำนวนช่วง (${label})`} value={fmt(rows.length)} sub={`มีความเคลื่อนไหว ${fmt(d.periods.length)} ช่วง`} />
+        <Stat label="รับเข้ารวม" value={fmt(tot.received)} />
+        <Stat label="ออกรวม" value={fmt(tot.issued)} />
+        <Stat label="สุทธิ (รับ − ออก)" value={`${tot.received - tot.issued >= 0 ? "+" : ""}${fmt(tot.received - tot.issued)}`} tone={tot.received - tot.issued < 0 ? "text-red-600" : "text-green-700"} />
+      </div>
+
+      <Card title={`รับเข้า / ออก ${label}`} note="ชี้ที่แท่งเพื่อดูตัวเลข · กดแถวในตารางด้านล่างเพื่อดูว่าสินค้าอะไรเคลื่อนไหวในช่วงนั้น">
+        <PeriodChart rows={rows} g={g} />
+      </Card>
+
+      <Card
+        title={`สรุป${label}`}
+        actions={<CsvButton onClick={() => downloadCsv(`report-${g}_${fileTag}.csv`, [
+          ["ช่วงเวลา", (x) => periodLabel(x.period, g)], ["เริ่ม", (x) => x.period], ["รับเข้า", (x) => x.received], ["ออก", (x) => x.issued],
+          ["สุทธิ", (x) => x.net], ["จำนวนรายการ", (x) => x.tx_count], ["สินค้าที่เคลื่อนไหว", (x) => x.products],
+        ], rows)} />}
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-600 text-xs">
+              <tr>
+                <th className="p-2 text-left">ช่วงเวลา</th>
+                <th className="p-2 text-right">รับเข้า</th>
+                <th className="p-2 text-right">ออก</th>
+                <th className="p-2 text-right">สุทธิ</th>
+                <th className="p-2 text-right">รายการ</th>
+                <th className="p-2 text-right">สินค้าที่เคลื่อนไหว</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...rows].reverse().map((x) => (
+                <tr key={x.period} onClick={() => x.tx_count && setPicked(picked === x.period ? "" : x.period)}
+                  className={`border-t ${x.tx_count ? "cursor-pointer hover:bg-blue-50" : "text-gray-400"} ${picked === x.period ? "bg-blue-50 font-medium" : ""}`}>
+                  <td className="p-2">{periodLabel(x.period, g)} {x.tx_count > 0 && <span className="text-blue-600 text-xs">{picked === x.period ? "▲" : "▼"}</span>}</td>
+                  <td className="p-2 text-right tabular-nums" style={{ color: x.received ? C_IN : undefined }}>{x.received ? `+${fmt(x.received)}` : "-"}</td>
+                  <td className="p-2 text-right tabular-nums" style={{ color: x.issued ? C_OUT : undefined }}>{x.issued ? `−${fmt(x.issued)}` : "-"}</td>
+                  <td className={`p-2 text-right tabular-nums ${x.net < 0 ? "text-red-600" : ""}`}>{x.tx_count ? fmt(x.net) : "-"}</td>
+                  <td className="p-2 text-right tabular-nums">{x.tx_count ? fmt(x.tx_count) : "-"}</td>
+                  <td className="p-2 text-right tabular-nums">{x.products ? fmt(x.products) : "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {picked && (
+        <Card
+          title={`สินค้าที่เคลื่อนไหว — ${periodLabel(picked, g)}`}
+          actions={<CsvButton onClick={() => downloadCsv(`report-${g}-${picked}_${fileTag}.csv`, [
+            ["SKU", (x) => x.sku], ["สินค้า", (x) => x.product_name], ["สาขา", (x) => x.branch_name], ["รับเข้า", (x) => x.received], ["ออก", (x) => x.issued], ["สุทธิ", (x) => x.net], ["หน่วย", (x) => x.unit],
+          ], detail)} />}
+        >
+          <DataTable
+            rows={detail}
+            searchKeys={["product_name", "sku", "branch_name"]}
+            columns={[
+              ["สินค้า", (x) => <>{x.product_name} <span className="text-gray-400">({x.sku})</span></>],
+              ...(showBranch ? [["สาขา", (x) => x.branch_name]] : []),
+              ["รับเข้า", (x) => (x.received ? `+${fmt(x.received)}` : "-"), "r"],
+              ["ออก", (x) => (x.issued ? `−${fmt(x.issued)}` : "-"), "r"],
+              ["สุทธิ", (x) => fmt(x.net), "r", (x) => (x.net < 0 ? "text-red-600" : "")],
+              ["หน่วย", (x) => x.unit],
+            ]}
+          />
+        </Card>
+      )}
+    </>
+  );
+}
+
+// กราฟแท่งคู่ต่อช่วงเวลา (รับเข้า/ออก) — แกนเดียว, ชี้เพื่อดูค่า
+function PeriodChart({ rows, g }) {
+  const [hover, setHover] = useState(null);
+  if (!rows.some((x) => x.received || x.issued)) return <p className="text-sm text-gray-400 py-8 text-center">ไม่มีการรับเข้า/ออกในช่วงนี้</p>;
+  const W = 900, H = 260, L = 52, R = 8, T = 12, B = 30;
+  const max = Math.max(1, ...rows.map((x) => Math.max(x.received, x.issued)));
+  const niceMax = niceTop(max);
+  const colW = (W - L - R) / rows.length;
+  const barW = Math.max(1, Math.min(28, (colW - 6) / 2));
+  const y = (v) => T + (H - T - B) * (1 - v / niceMax);
+  const bar = (x, v, color) => {
+    if (v <= 0) return null;
+    const top = y(v), base = H - B, r = Math.min(4, barW / 2, base - top);
+    return <path d={`M${x},${base} V${top + r} Q${x},${top} ${x + r},${top} H${x + barW - r} Q${x + barW},${top} ${x + barW},${top + r} V${base} Z`} fill={color} />;
+  };
+  const every = Math.ceil(rows.length / 10);
+  const short = (k) => g === "month" ? new Date(`${k}T00:00:00`).toLocaleDateString("th-TH", { month: "short", year: "2-digit" })
+    : new Date(`${k}T00:00:00`).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  return (
+    <div className="relative">
+      <div className="flex gap-4 text-sm mb-2">
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: C_IN }} />รับเข้า</span>
+        <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm" style={{ background: C_OUT }} />ออก</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="กราฟรับเข้าและออกตามช่วงเวลา" onMouseLeave={() => setHover(null)}>
+        {[0, 1, 2, 3, 4].map((i) => (niceMax / 4) * i).map((v) => (
+          <g key={v}>
+            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} stroke="#e5e7eb" />
+            <text x={L - 6} y={y(v) + 4} textAnchor="end" fontSize="11" fill="#6b7280">{v.toLocaleString()}</text>
+          </g>
+        ))}
+        {rows.map((x, i) => {
+          const cx = L + i * colW, gx = cx + (colW - (barW * 2 + 2)) / 2;
+          return (
+            <g key={x.period}>
+              {hover === i && <rect x={cx} y={T} width={colW} height={H - T - B} fill="#f3f4f6" />}
+              {bar(gx, x.received, C_IN)}
+              {bar(gx + barW + 2, x.issued, C_OUT)}
+              {i % every === 0 && <text x={cx + colW / 2} y={H - 10} textAnchor="middle" fontSize="10" fill="#6b7280">{short(x.period)}</text>}
+              <rect x={cx} y={T} width={colW} height={H - T - B} fill="transparent" onMouseEnter={() => setHover(i)} />
+            </g>
+          );
+        })}
+        <line x1={L} x2={W - R} y1={H - B} y2={H - B} stroke="#9ca3af" />
+      </svg>
+      {hover != null && (
+        <div className="absolute pointer-events-none bg-white border shadow rounded px-3 py-2 text-sm" style={{ left: `${Math.min(78, ((L + (hover + 0.5) * colW) / W) * 100)}%`, top: 24 }}>
+          <div className="text-xs text-gray-500 mb-1">{periodLabel(rows[hover].period, g)}</div>
+          <div className="flex items-center gap-2"><span className="w-3 h-0.5" style={{ background: C_IN }} /><b className="tabular-nums">{fmt(rows[hover].received)}</b><span className="text-gray-500">รับเข้า</span></div>
+          <div className="flex items-center gap-2"><span className="w-3 h-0.5" style={{ background: C_OUT }} /><b className="tabular-nums">{fmt(rows[hover].issued)}</b><span className="text-gray-500">ออก</span></div>
+        </div>
+      )}
+    </div>
   );
 }

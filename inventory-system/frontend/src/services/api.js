@@ -11,8 +11,14 @@ import axios from "axios";
 // สร้าง axios instance พิเศษที่มีค่าเริ่มต้นตั้งไว้แล้ว
 // baseURL คือ URL หลักของ backend server ทุก request จะเริ่มจากที่นี่
 // เช่น api.get("/products") จะส่งไปที่ http://localhost:5000/api/products จริงๆ
+// ที่อยู่ backend:
+//   - ตั้งเองได้ด้วยตัวแปร VITE_API_URL (ไฟล์ frontend/.env หรือตอน build) เช่น https://my-api.up.railway.app/api
+//   - ไม่ตั้ง + รันแบบพัฒนา (npm run dev) → http://localhost:5000/api
+//   - ไม่ตั้ง + build ไปใช้จริง → /api (backend เสิร์ฟหน้าเว็บนี้เองจากที่อยู่เดียวกัน — ดู backend/src/server.js)
+export const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:5000/api" : "/api");
+
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: API_URL,
 });
 
 // interceptors.request คือ "ตัวดักจับ" ที่รันก่อน request ทุกอันจะถูกส่งออกไป

@@ -22,7 +22,9 @@ const cors = require('cors');
 const app = express();
 
 // เปิดใช้ CORS สำหรับทุก request (อนุญาตให้ frontend เรียกได้)
-app.use(cors());
+// CORS: ตอนพัฒนาอนุญาตทุกที่ / ตอนใช้จริงตั้ง CORS_ORIGIN เป็นที่อยู่หน้าเว็บ (คั่นหลายที่ด้วย ,)
+// ถ้า backend เสิร์ฟหน้าเว็บเอง (ที่อยู่เดียวกัน) ไม่ต้องตั้ง
+app.use(cors(process.env.CORS_ORIGIN ? { origin: process.env.CORS_ORIGIN.split(',').map((s) => s.trim()) } : undefined));
 
 // บอก Express ให้แปลง request body ที่เป็น JSON อัตโนมัติ
 // ทำให้ controller เข้าถึง req.body.name, req.body.email ฯลฯ ได้
@@ -62,6 +64,21 @@ app.use('/api/users',     require('./routes/userRoutes'));
 // GET /api/health — ใช้ตรวจสอบว่า server ทำงานอยู่หรือไม่
 // ตอบกลับ { status: 'ok' } ถ้า server ปกติ
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// ─── เสิร์ฟหน้าเว็บ (ตอนใช้จริง) ──────────────────────────────────
+// ถ้ามีโฟลเดอร์ frontend/dist (ได้จาก npm run build) ให้ backend เสิร์ฟหน้าเว็บด้วย
+// → ขึ้นเซิร์ฟเวอร์ (เช่น Railway) เป็นบริการเดียว ที่อยู่เดียว ไม่ต้องตั้ง CORS
+const path = require('path');
+const fs = require('fs');
+const DIST = process.env.FRONTEND_DIST || path.join(__dirname, '..', '..', 'frontend', 'dist');
+if (fs.existsSync(path.join(DIST, 'index.html'))) {
+  app.use(express.static(DIST));
+  // เส้นทางของหน้าเว็บ (เช่น /dashboard) ส่ง index.html ให้ React จัดการต่อ — ยกเว้น /api
+  app.get(/^\/(?!api\/).*/, (req, res) => res.sendFile(path.join(DIST, 'index.html')));
+  console.log(`Serving frontend from ${DIST}`);
+}
+// /api ที่ไม่มีอยู่ → ตอบ JSON (ไม่ใช่หน้า HTML)
+app.use('/api', (req, res) => res.status(404).json({ message: 'ไม่พบ API นี้' }));
 
 // ─── เริ่มฟัง request ────────────────────────────────────────
 // อ่าน PORT จาก .env ถ้าไม่มีให้ใช้ 5000 เป็น default

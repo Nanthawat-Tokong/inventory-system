@@ -12,6 +12,7 @@ import { useState } from "react";
 // axios คือ library สำหรับส่ง HTTP request ไปยัง server
 // ในหน้านี้ใช้ axios โดยตรง (ไม่ใช้ api.js) เพราะยังไม่มี token ตอน login
 import axios from "axios";
+import { API_URL } from "../services/api";
 
 export default function LoginPage() {
   // state เก็บค่าในช่องกรอกอีเมล ตอน user พิมพ์ค่าจะอัปเดตทันที
@@ -31,10 +32,10 @@ export default function LoginPage() {
     // ถ้าไม่ใส่บรรทัดนี้ หน้าจะ refresh ทุกครั้งที่กด submit
     e.preventDefault();
     try {
-      // ส่ง POST request ไปยัง http://localhost:5000/api/auth/login
+      // ส่ง POST request ไปยัง <API_URL>/auth/login (ที่อยู่ backend ตั้งค่าใน services/api.js)
       // พร้อมส่งอีเมลและรหัสผ่านเป็น request body
       // รอรับ response กลับมา (async/await หมายความว่ารอจนได้ผลก่อนไปบรรทัดถัดไป)
-      const res = await axios.post("http://localhost:5000/api/auth/login", {
+      const res = await axios.post(`${API_URL}/auth/login`, {
         email,
         password,
       });

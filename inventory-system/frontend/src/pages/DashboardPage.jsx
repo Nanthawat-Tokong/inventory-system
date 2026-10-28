@@ -35,15 +35,20 @@ export default function DashboardPage() {
   const [level, setLevel] = useState("");
   const [page, setPage] = useState(1);
   const location = useLocation();
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [tick, setTick] = useState(0);
 
+  // ข้อมูลแบบ Real-time: โหลดใหม่เองทุก 30 วินาที (และทุกครั้งที่กลับมาหน้านี้ / กดปุ่มรีเฟรช)
   useEffect(() => {
     let cancelled = false;
-    api.get("/inventory/stock")
-      .then((res) => { if (!cancelled) { setStock(res.data); setError(""); } })
+    const load = () => api.get("/inventory/stock")
+      .then((res) => { if (!cancelled) { setStock(res.data); setError(""); setUpdatedAt(new Date()); } })
       .catch((err) => { if (!cancelled) setError(err.response?.data?.message || "โหลดข้อมูลสต๊อกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"); })
       .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [location.key]);
+    load();
+    const timer = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [location.key, tick]);
 
   const branches = useMemo(() => [...new Map(stock.map((r) => [r.branch_id, r.branch_name])).entries()], [stock]);
 
@@ -84,7 +89,14 @@ export default function DashboardPage() {
       <Navbar />
       <div className="p-6 max-w-7xl mx-auto">
         <MyTasks />
-        <h2 className="text-xl font-bold mb-1">สต๊อกสินค้าตอนนี้</h2>
+        <div className="flex flex-wrap items-end justify-between gap-2 mb-1">
+          <h2 className="text-xl font-bold">สต๊อกสินค้าตอนนี้</h2>
+          <div className="text-xs text-gray-500 flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            อัปเดตอัตโนมัติทุก 30 วินาที{updatedAt && ` · ล่าสุด ${updatedAt.toLocaleTimeString("th-TH")}`}
+            <button onClick={() => setTick((n) => n + 1)} className="border rounded px-2 py-0.5 bg-white hover:bg-gray-50">↻ รีเฟรช</button>
+          </div>
+        </div>
         <p className="text-sm text-gray-500 mb-4">กดที่กล่องตัวเลขเพื่อดูเฉพาะรายการนั้น เช่น กด “หมดสต๊อก” เพื่อดูของที่หมด</p>
 
         {error && <div className="bg-red-100 border border-red-400 text-red-700 p-4 rounded mb-6">⚠️ {error}</div>}
@@ -99,6 +111,10 @@ export default function DashboardPage() {
               <Card label="ใกล้หมด (ต่ำกว่าเกณฑ์)" value={summary.low} tone="text-amber-600" active={level === "low"} onClick={() => setFilter(setLevel)(level === "low" ? "" : "low")} />
               <Card label="ปกติ" value={summary.ok} tone="text-green-600" active={level === "ok"} onClick={() => setFilter(setLevel)(level === "ok" ? "" : "ok")} />
             </div>
+
+            <StockChart stock={stock} byBranch={branches.length > 1 && !branch} branchName={branch ? branches.find(([id]) => String(id) === branch)?.[1] : null}
+              onPickBranch={branches.length > 1 ? (id) => setFilter(setBranch)(String(id)) : null}
+              rowsForCategory={branch ? stock.filter((r) => String(r.branch_id) === branch) : stock} />
 
             <div className="bg-white rounded-lg shadow">
               <div className="flex flex-wrap gap-3 p-4 border-b">
@@ -174,5 +190,54 @@ function Card({ label, value, sub, active, onClick, tone }) {
       <p className={`text-3xl font-bold ${tone || "text-gray-800"}`}>{value.toLocaleString()}</p>
       {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
     </button>
+  );
+}
+
+// ─── กราฟสต๊อกรวม ─────────────────────────────────────────────
+// เห็นหลายสาขา → แท่งละ 1 สาขา (กดแท่งเพื่อกรองตารางเป็นสาขานั้น)
+// เห็นสาขาเดียว (หรือเลือกสาขาแล้ว) → แท่งละ 1 หมวดสินค้า
+// แสดงตัวเลขบนแท่งทุกแท่ง + จำนวนรายการที่หมด/ใกล้หมด (ไม่ต้องชี้ก็อ่านได้)
+function StockChart({ stock, byBranch, branchName, onPickBranch, rowsForCategory }) {
+  const groups = new Map();
+  const src = byBranch ? stock : rowsForCategory;
+  src.forEach((r) => {
+    const key = byBranch ? r.branch_id : (r.category || "ไม่ระบุหมวด");
+    const label = byBranch ? r.branch_name : key;
+    const g = groups.get(key) || { key, label, units: 0, out: 0, low: 0 };
+    g.units += Math.max(0, Number(r.stock));
+    const lv = levelOf(r);
+    if (lv === "out") g.out++; else if (lv === "low") g.low++;
+    groups.set(key, g);
+  });
+  const rows = [...groups.values()].sort((a, b) => b.units - a.units);
+  const max = Math.max(1, ...rows.map((g) => g.units));
+  if (rows.length === 0) return null;
+  return (
+    <div className="bg-white rounded-lg shadow p-4 mb-6">
+      <h3 className="font-bold">{byBranch ? "สต๊อกรวมแยกตามสาขา" : `สต๊อกรวมแยกตามหมวดสินค้า${branchName ? ` — ${branchName}` : ""}`}</h3>
+      <p className="text-xs text-gray-500 mb-3">จำนวนชิ้นคงเหลือ{byBranch ? " · กดที่แท่งเพื่อดูเฉพาะสาขานั้น" : ""}</p>
+      <ul className="space-y-2">
+        {rows.map((g) => (
+          <li key={g.key}>
+            <button
+              type="button" disabled={!byBranch || !onPickBranch}
+              onClick={() => onPickBranch && byBranch && onPickBranch(g.key)}
+              className="w-full grid grid-cols-[minmax(6rem,11rem)_1fr_auto] items-center gap-3 text-left group disabled:cursor-default"
+              title={`${g.label}: ${g.units.toLocaleString()} ชิ้น · หมด ${g.out} · ใกล้หมด ${g.low}`}
+            >
+              <span className="text-sm truncate">{g.label}</span>
+              <span className="h-5 bg-gray-100 rounded-r relative">
+                <span className={`block h-5 rounded-r ${byBranch ? "group-hover:opacity-80" : ""}`} style={{ width: `${Math.max(0.5, (g.units / max) * 100)}%`, background: "#2a78d6" }} />
+              </span>
+              <span className="text-sm tabular-nums whitespace-nowrap">
+                <b>{g.units.toLocaleString()}</b>
+                {g.out > 0 && <span className="ml-2 text-xs text-red-600">หมด {g.out.toLocaleString()}</span>}
+                {g.low > 0 && <span className="ml-2 text-xs text-amber-700">ใกล้หมด {g.low.toLocaleString()}</span>}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

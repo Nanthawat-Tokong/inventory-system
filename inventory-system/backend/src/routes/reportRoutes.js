@@ -12,6 +12,10 @@ const role = require('../middleware/roleMiddleware');
 
 const anyRole = role('admin', 'main_manager', 'staff', 'shipper');
 
+router.get('/periodic', auth, anyRole, c.periodic);   // รายวัน/รายสัปดาห์/รายเดือน (group=day|week|month)
+router.get('/daily', auth, anyRole, c.daily);         // วันนี้
+router.get('/weekly', auth, anyRole, c.weekly);       // สัปดาห์นี้ (จันทร์–วันนี้)
+router.get('/monthly', auth, anyRole, c.monthly);     // เดือนนี้
 router.get('/summary', auth, anyRole, c.summary);
 router.get('/movement', auth, anyRole, c.movement);
 router.get('/top', auth, anyRole, c.top);
