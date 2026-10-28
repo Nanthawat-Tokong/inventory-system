@@ -143,7 +143,10 @@ export default function DashboardPage() {
                           <td className="p-3 text-gray-500">{r.category}</td>
                           <td className="p-3">{r.branch_name}</td>
                           <td className={`p-3 text-right font-bold ${lv.num}`}>{Number(r.stock).toLocaleString()} {r.unit}</td>
-                          <td className="p-3 text-right text-gray-500">{r.low_stock_threshold}</td>
+                          <td className="p-3 text-right text-gray-500">
+                            {r.low_stock_threshold}
+                            {r.threshold_source === "branch" && <span className="ml-1 text-xs text-blue-600" title="ตั้งเฉพาะสาขานี้ในหน้า ตั้งค่าแจ้งเตือน">*</span>}
+                          </td>
                           <td className="p-3"><span className={`px-2 py-0.5 rounded text-xs ${lv.cls}`}>{lv.text}</span></td>
                         </tr>
                       );

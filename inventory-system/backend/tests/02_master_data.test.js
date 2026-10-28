@@ -119,6 +119,43 @@ describe('สินค้าประจำสาขา', () => {
   });
 });
 
+describe('เกณฑ์แจ้งเตือนเฉพาะสาขา มีผลจริงทุกหน้า', () => {
+  // ค่ากลางของน้ำดื่ม = 10 → เชียงใหม่ตั้งเฉพาะสาขาเป็น 30
+  before(async () => {
+    await h.receiveStock(t, P.WATER, 20);
+    await api(t.admin, 'POST', '/alerts', { product_id: P.WATER, branch_id: B.CNX, min_quantity: 30 });
+  });
+  it('หน้า Dashboard (ดูสต๊อก): เชียงใหม่ใช้ 30, สาขาหลักยังใช้ค่ากลาง 10', async () => {
+    const rows = (await api(t.admin, 'GET', '/inventory/stock')).body;
+    const cnx = rows.find((r) => r.product_id === P.WATER && r.branch_id === B.CNX);
+    const hq = rows.find((r) => r.product_id === P.WATER && r.branch_id === B.HQ);
+    assert.equal(cnx.low_stock_threshold, 30);
+    assert.equal(cnx.threshold_source, 'branch');
+    assert.equal(hq.low_stock_threshold, 10);
+    assert.equal(hq.threshold_source, 'product');
+  });
+  it('หน้าสินค้า: พนักงานเชียงใหม่เห็นเกณฑ์ 30', async () => {
+    const w = (await api(t.cnxStaff, 'GET', '/products')).body.find((p) => p.id === P.WATER);
+    assert.equal(w.threshold, 30);
+    assert.equal(w.threshold_source, 'branch');
+  });
+  it('รายการสต๊อกต่ำ: สาขาหลักมี 20+ (≥10) ไม่ติด, เชียงใหม่มี 0 (<30) ติด พร้อมเกณฑ์ 30', async () => {
+    const rows = (await api(t.admin, 'GET', '/alerts')).body.filter((r) => r.product_id === P.WATER);
+    assert.ok(!rows.some((r) => r.branch_id === B.HQ));
+    assert.equal(rows.find((r) => r.branch_id === B.CNX).min_quantity, 30);
+  });
+  it('รายงานควรสั่งเพิ่ม: เชียงใหม่แนะนำเติมถึง 2 เท่าของ 30 = 60', async () => {
+    const rows = (await api(t.admin, 'GET', `/reports/reorder?branch_id=${B.CNX}`)).body.rows;
+    assert.equal(rows.find((r) => r.product_id === P.WATER).suggest, 60);
+  });
+  it('ปิดกฎ → กลับไปใช้ค่ากลาง', async () => {
+    const rule = (await api(t.admin, 'GET', '/alerts/settings')).body.find((r) => r.product_id === P.WATER && r.branch_id === B.CNX);
+    await api(t.admin, 'PUT', `/alerts/${rule.id}`, { min_quantity: 30, is_active: 0 });
+    const cnx = (await api(t.admin, 'GET', `/inventory/stock/${B.CNX}`)).body.find((r) => r.product_id === P.WATER);
+    assert.equal(cnx.low_stock_threshold, 10);
+  });
+});
+
 describe('กฎแจ้งเตือน', () => {
   it('ผู้จัดการตั้งกฎให้สาขาตัวเอง และตั้งซ้ำ = อัปเดต', async () => {
     assert.equal((await api(t.manager, 'POST', '/alerts', { product_id: P.WATER, min_quantity: 5 })).status, 201);

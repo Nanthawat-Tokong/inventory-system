@@ -10,7 +10,13 @@
 
 const pool = require('../config/db');
 const { isAdmin, ownBranch } = require('../utils/permissions');
-const { lockStock, isPositiveInt, getWarehouse } = require('../utils/stock');
+const { lockStock, isPositiveInt, getWarehouse, THRESHOLD_JOIN, THRESHOLD_SQL, THRESHOLD_SOURCE_SQL } = require('../utils/stock');
+
+// ค่ากลางของสินค้า (ใช้เมื่อสาขาไม่ได้ตั้งกฎแจ้งเตือนเฉพาะ)
+const productThreshold = async (productId) => {
+  const [[p]] = await pool.query('SELECT low_stock_threshold FROM products WHERE id = ?', [productId]);
+  return p ? Number(p.low_stock_threshold) : 0;
+};
 
 // ตรวจข้อมูลเข้าของ receive/issue — จำนวนต้องเป็นจำนวนเต็มบวก (กันส่ง -50 ตรงมาทาง API
 // เพื่อ "ออกสินค้าติดลบ" ซึ่งจะกลายเป็นเพิ่มสต๊อกโดยไม่ผ่านใบขอเบิก)
@@ -86,7 +92,7 @@ const receive = async (req, res) => {
       message: 'บันทึกรับสินค้าเข้าแล้ว',
       stock_after,
       // ถ้ามีกฎแจ้งเตือน และสต๊อกใหม่ต่ำกว่า threshold → true
-      alert_triggered: alert ? stock_after < alert.min_quantity : false
+      alert_triggered: stock_after < (alert ? alert.min_quantity : await productThreshold(product_id))
     });
   } catch (err) {
     // ถ้าเกิดข้อผิดพลาด ย้อนกลับทุกอย่างในระหว่าง transaction
@@ -142,7 +148,7 @@ const issue = async (req, res) => {
     res.status(201).json({
       message: 'บันทึกออกสินค้าแล้ว',
       stock_after,
-      alert_triggered: alert ? stock_after < alert.min_quantity : false
+      alert_triggered: stock_after < (alert ? alert.min_quantity : await productThreshold(product_id))
     });
   } catch (err) {
     await conn.rollback();
@@ -179,11 +185,13 @@ const getAllStock = async (req, res) => {
         b.id                    AS branch_id,
         COALESCE(cs.stock, 0)   AS stock,
         p.name AS product_name, p.sku, p.category, p.unit,
-        p.low_stock_threshold   AS low_stock_threshold,
+        ${THRESHOLD_SQL}        AS low_stock_threshold,   -- เกณฑ์เฉพาะสาขา (ถ้าตั้ง) หรือค่ากลางของสินค้า
+        ${THRESHOLD_SOURCE_SQL} AS threshold_source,
         b.name AS branch_name
       FROM products p
       CROSS JOIN branches b
       LEFT JOIN current_stock cs ON cs.product_id = p.id AND cs.branch_id = b.id
+      ${THRESHOLD_JOIN}
       WHERE p.is_deleted = 0 AND b.is_deleted = 0
       ${branchFilter}
       ORDER BY b.name, p.name
@@ -212,11 +220,13 @@ const getBranchStock = async (req, res) => {
       SELECT p.id AS product_id, b.id AS branch_id,
         COALESCE(cs.stock, 0) AS stock,
         p.name as product_name, p.sku, p.category, p.unit,
-        p.low_stock_threshold AS low_stock_threshold,
+        ${THRESHOLD_SQL} AS low_stock_threshold,
+        ${THRESHOLD_SOURCE_SQL} AS threshold_source,
         b.name as branch_name
       FROM products p
       JOIN branches b ON b.id = ?
       LEFT JOIN current_stock cs ON cs.product_id = p.id AND cs.branch_id = b.id
+      ${THRESHOLD_JOIN}
       WHERE p.is_deleted = 0
       ORDER BY p.name
     `, [branchId]);

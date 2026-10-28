@@ -42,4 +42,11 @@ const getWarehouse = async (db) => {
   return row || null;
 };
 
-module.exports = { lockStock, stockMap, isPositiveInt, isNonNegativeInt, getWarehouse };
+// เกณฑ์ขั้นต่ำที่ใช้จริงของ "สินค้า × สาขา" (ใช้ใน SQL ที่มี alias p = products, b = branches):
+//   ถ้าสาขาตั้งกฎแจ้งเตือนของสินค้านั้นไว้ (หน้า "ตั้งค่าแจ้งเตือน") → ใช้ค่านั้น
+//   ถ้าไม่ได้ตั้ง → ใช้ค่ากลางของสินค้า (products.low_stock_threshold)
+const THRESHOLD_JOIN = 'LEFT JOIN alerts al ON al.product_id = p.id AND al.branch_id = b.id AND al.is_active = 1';
+const THRESHOLD_SQL = 'COALESCE(al.min_quantity, p.low_stock_threshold)';
+const THRESHOLD_SOURCE_SQL = "IF(al.id IS NULL, 'product', 'branch')";
+
+module.exports = { lockStock, stockMap, isPositiveInt, isNonNegativeInt, getWarehouse, THRESHOLD_JOIN, THRESHOLD_SQL, THRESHOLD_SOURCE_SQL };

@@ -22,7 +22,7 @@ const PAGE_SIZE = 50;
 const stockLevel = (p) => {
   const n = Number(p.stock) || 0;
   if (n <= 0) return "out";
-  if (n < Number(p.low_stock_threshold)) return "low";
+  if (n < Number(p.threshold ?? p.low_stock_threshold)) return "low"; // เกณฑ์เฉพาะสาขา (ถ้าตั้ง) หรือค่ากลาง
   return "ok";
 };
 const LEVEL = {
@@ -305,7 +305,10 @@ export default function ProductsPage() {
                     {atWarehouse ? (p.total_stock !== undefined ? Number(p.total_stock).toLocaleString() : "") : Number(p.warehouse_stock || 0).toLocaleString()}
                   </td>
                   <td className="p-3">{p.unit}</td>
-                  <td className="p-3 text-right">{p.low_stock_threshold}</td>
+                  <td className="p-3 text-right">
+                    {p.threshold ?? p.low_stock_threshold}
+                    {p.threshold_source === "branch" && <div className="text-xs text-blue-600" title={`ค่ากลางของสินค้า = ${p.low_stock_threshold}`}>ตั้งเฉพาะสาขา</div>}
+                  </td>
                   {canManage && (
                     <td className="p-3 flex gap-2">
                       {/* ปุ่มแก้ไข: โหลดข้อมูลสินค้านี้เข้าฟอร์มด้านบน */}

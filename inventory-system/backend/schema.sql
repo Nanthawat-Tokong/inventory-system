@@ -64,9 +64,10 @@ CREATE TABLE IF NOT EXISTS alerts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   product_id INT NOT NULL,
   branch_id INT NOT NULL,
-  min_quantity INT NOT NULL DEFAULT 10,
+  min_quantity INT NOT NULL DEFAULT 10,          -- เกณฑ์ขั้นต่ำเฉพาะสาขานี้ (แทนค่ากลาง products.low_stock_threshold)
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_alert_product_branch (product_id, branch_id),
   FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
   FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE
 );

@@ -15,6 +15,7 @@
 // ============================================================
 
 const pool = require('../config/db');
+const { THRESHOLD_JOIN, THRESHOLD_SQL, THRESHOLD_SOURCE_SQL } = require('../utils/stock');
 const { isAdmin, ownBranch, isWarehouseAuthority, isShipper } = require('../utils/permissions');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -60,13 +61,15 @@ const SHIPPED_TOTAL = `(COALESCE(ri.shipped_qty, 0) + COALESCE((
 const currentStockRows = async (branchId) => {
   const b = branchSql('b.id', branchId);
   const [rows] = await pool.query(`
-    SELECT p.id AS product_id, p.name, p.sku, p.category, p.unit, p.low_stock_threshold AS threshold,
+    SELECT p.id AS product_id, p.name, p.sku, p.category, p.unit,
+      ${THRESHOLD_SQL} AS threshold, ${THRESHOLD_SOURCE_SQL} AS threshold_source,
       b.id AS branch_id, b.name AS branch_name, b.is_warehouse,
       COALESCE(cs.stock, 0) AS stock
     FROM products p
     JOIN branch_products bp ON bp.product_id = p.id AND bp.is_active = 1
     JOIN branches b ON b.id = bp.branch_id AND b.is_deleted = 0
     LEFT JOIN current_stock cs ON cs.product_id = p.id AND cs.branch_id = b.id
+    ${THRESHOLD_JOIN}
     WHERE p.is_deleted = 0 ${b.sql}
   `, b.params);
   return rows.map((r) => ({ ...r, stock: Number(r.stock) }));

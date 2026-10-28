@@ -40,6 +40,9 @@ const getAll = async (req, res) => {
       FROM transactions t JOIN branches b ON b.id = t.branch_id AND b.is_deleted = 0
       GROUP BY t.product_id, t.branch_id
     `);
+    // เกณฑ์เฉพาะสาขาของผู้ใช้ (ถ้าสาขาตั้งกฎแจ้งเตือนไว้) — ไม่มี = ใช้ค่ากลางของสินค้า
+    const [rules] = await pool.query('SELECT product_id, min_quantity FROM alerts WHERE branch_id = ? AND is_active = 1', [myBranch]);
+    const ruleMap = new Map(rules.map((r) => [r.product_id, Number(r.min_quantity)]));
     const mine = new Map(), warehouse = new Map(), total = new Map();
     for (const s of stocks) {
       const qty = Number(s.stock);
@@ -50,6 +53,8 @@ const getAll = async (req, res) => {
     res.json(rows.map((p) => ({
       ...p,
       stock: mine.get(p.id) || 0,
+      threshold: ruleMap.has(p.id) ? ruleMap.get(p.id) : p.low_stock_threshold,
+      threshold_source: ruleMap.has(p.id) ? 'branch' : 'product',
       warehouse_stock: warehouse.get(p.id) || 0,
       ...(seesCatalog ? { total_stock: total.get(p.id) || 0 } : {}),
     })));

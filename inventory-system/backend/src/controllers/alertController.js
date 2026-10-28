@@ -9,6 +9,7 @@
 
 const pool = require('../config/db');
 const { isAdmin, ownBranch } = require('../utils/permissions');
+const { THRESHOLD_JOIN, THRESHOLD_SQL, THRESHOLD_SOURCE_SQL } = require('../utils/stock');
 
 // helper: สร้าง SQL condition สำหรับกรองตามสาขา (ใช้ใน getSettings)
 // alias คือชื่อ table alias ใน SQL เช่น 'a' สำหรับตาราง alerts
@@ -51,12 +52,14 @@ const getAll = async (req, res) => {
         -- stock คือสต๊อกปัจจุบัน (COALESCE เป็น 0 ถ้ายังไม่เคยมี transaction)
         COALESCE(cs.stock, 0)   AS stock,
         -- คืน threshold ออกไปด้วย เพื่อให้ frontend แสดงข้อมูลได้
-        p.low_stock_threshold   AS min_quantity
+        ${THRESHOLD_SQL}        AS min_quantity,      -- เกณฑ์เฉพาะสาขา (ถ้าตั้ง) หรือค่ากลางของสินค้า
+        ${THRESHOLD_SOURCE_SQL} AS threshold_source
       FROM products p
       CROSS JOIN branches b
       LEFT JOIN current_stock cs ON cs.product_id = p.id AND cs.branch_id = b.id
+      ${THRESHOLD_JOIN}
       -- WHERE กรองเฉพาะสินค้าที่สต๊อกต่ำกว่า threshold และยังไม่ถูก soft-delete
-      WHERE COALESCE(cs.stock, 0) < p.low_stock_threshold
+      WHERE COALESCE(cs.stock, 0) < ${THRESHOLD_SQL}
         AND p.is_deleted = 0 AND b.is_deleted = 0
         ${branchFilter}
       ORDER BY b.name, p.name
