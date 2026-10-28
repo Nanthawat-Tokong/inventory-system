@@ -29,6 +29,7 @@ const file = path.join(DIR, `${DB}_${stamp}.sql`);
 const out = fs.createWriteStream(file);
 const child = spawn(DUMP, [
   '-h', process.env.DB_HOST || 'localhost',
+  '-P', String(process.env.DB_PORT || 3306),
   '-u', process.env.DB_USER || 'root',
   '--single-transaction',   // สำรองได้ขณะระบบเปิดใช้งาน ข้อมูลไม่ขาดครึ่งๆ กลางๆ
   '--routines', '--triggers',

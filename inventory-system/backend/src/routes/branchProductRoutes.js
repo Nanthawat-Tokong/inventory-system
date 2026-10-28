@@ -11,14 +11,16 @@ const { listBranches, listByBranch, updateMappings } = require('../controllers/b
 
 const auth = require('../middleware/authMiddleware');
 const role = require('../middleware/roleMiddleware');
+// กำหนดสินค้าให้ทุกสาขาได้ → เฉพาะ admin / ผู้จัดการคลังหลัก (ผู้จัดการสาขาย่อยแก้ของสาขาอื่นไม่ได้)
+const { requireWarehouseAuthority } = require('../utils/permissions');
 
 // GET /api/branch-products/meta/branches — รายชื่อสาขาทั้งหมด (ต้องมาก่อน /:branchId กันชนกัน)
-router.get('/meta/branches', auth, role('admin', 'main_manager'), listBranches);
+router.get('/meta/branches', auth, role('admin', 'main_manager'), requireWarehouseAuthority, listBranches);
 
 // GET /api/branch-products/:branchId — ดูสินค้าทั้งหมดพร้อมสถานะ active ของสาขานี้
-router.get('/:branchId', auth, role('admin', 'main_manager'), listByBranch);
+router.get('/:branchId', auth, role('admin', 'main_manager'), requireWarehouseAuthority, listByBranch);
 
 // PUT /api/branch-products/:branchId — บันทึกรายการสินค้าที่เปิดใช้งานให้สาขานี้
-router.put('/:branchId', auth, role('admin', 'main_manager'), updateMappings);
+router.put('/:branchId', auth, role('admin', 'main_manager'), requireWarehouseAuthority, updateMappings);
 
 module.exports = router;

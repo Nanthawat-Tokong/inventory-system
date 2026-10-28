@@ -50,7 +50,9 @@ export default function Navbar() {
   };
 
   const mustChange = Number(user.must_change_password) === 1;
-  const items = mustChange ? [] : MENU.filter(([, , roles]) => roles.includes(user.role));
+  // สินค้าประจำสาขา: เฉพาะ admin / ผู้จัดการคลังหลัก
+  const warehouseManager = user.role === "admin" || (user.role === "main_manager" && Number(user.is_warehouse) === 1);
+  const items = mustChange ? [] : MENU.filter(([to, , roles]) => roles.includes(user.role) && (to !== "/branch-products" || warehouseManager));
   const linkCls = ({ isActive }) =>
     `relative px-3 py-2 rounded whitespace-nowrap ${isActive ? "bg-blue-800 font-semibold" : "hover:bg-blue-500"}`;
 

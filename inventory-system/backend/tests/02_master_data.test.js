@@ -1,12 +1,12 @@
 // ทดสอบ: สินค้า / สาขา / สินค้าประจำสาขา / กฎแจ้งเตือน
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B, P } = h;
 
 let t;
-before(async () => { t = await h.bootstrap(); });
-after(() => h.stopServer());
+beforeAll(async () => { t = await h.bootstrap(); });
+afterAll(() => h.stopServer());
 
 describe('สินค้า', () => {
   it('admin/ผู้จัดการเห็นสินค้าทั้งหมด, พนักงานเห็นเฉพาะที่เปิดใช้ในสาขาตัวเอง', async () => {
@@ -117,11 +117,15 @@ describe('สินค้าประจำสาขา', () => {
   it('พนักงานแก้ไม่ได้', async () => {
     assert.equal((await api(t.cnxStaff, 'PUT', `/branch-products/${B.CNX}`, { product_ids: [] })).status, 403);
   });
+  it('ผู้จัดการสาขาย่อยแก้สินค้าของสาขาอื่น (หรือของตัวเอง) ไม่ได้ — เป็นหน้าที่คลังหลัก', async () => {
+    assert.equal((await api(t.cnxMgr, 'PUT', `/branch-products/${B.PKT}`, { product_ids: [] })).status, 403);
+    assert.equal((await api(t.cnxMgr, 'GET', `/branch-products/${B.CNX}`)).status, 403);
+  });
 });
 
 describe('เกณฑ์แจ้งเตือนเฉพาะสาขา มีผลจริงทุกหน้า', () => {
   // ค่ากลางของน้ำดื่ม = 10 → เชียงใหม่ตั้งเฉพาะสาขาเป็น 30
-  before(async () => {
+  beforeAll(async () => {
     await h.receiveStock(t, P.WATER, 20);
     await api(t.admin, 'POST', '/alerts', { product_id: P.WATER, branch_id: B.CNX, min_quantity: 30 });
   });

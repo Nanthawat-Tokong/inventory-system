@@ -1,17 +1,17 @@
 // ทดสอบ: ใบขอเบิก — สร้าง / อนุมัติ / จัดส่ง / ตรวจรับ / สิทธิ์แต่ละบทบาท
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B, P } = h;
 
 let t;
-before(async () => {
+beforeAll(async () => {
   t = await h.bootstrap();
   await h.receiveStock(t, P.WATER, 100);
   await h.receiveStock(t, P.PEN, 20);
   // PAPER: คลังหลักไม่มีของ
 });
-after(() => h.stopServer());
+afterAll(() => h.stopServer());
 
 describe('สร้างใบขอเบิก — ต้องมีของในคลังหลัก', () => {
   it('สาขาเห็นสต๊อก "เบิกได้" ของคลังหลัก (เฉพาะที่มีของ)', async () => {
@@ -54,8 +54,8 @@ describe('สร้างใบขอเบิก — ต้องมีขอ�
 
 describe('สิทธิ์การดูใบขอเบิก', () => {
   let id;
-  before(async () => { id = await h.createRequisition(t.cnxStaff, [{ product_id: P.WATER, requested_qty: 2 }]); });
-  after(async () => { await api(t.cnxStaff, 'DELETE', `/requisitions/${id}`); });
+  beforeAll(async () => { id = await h.createRequisition(t.cnxStaff, [{ product_id: P.WATER, requested_qty: 2 }]); });
+  afterAll(async () => { await api(t.cnxStaff, 'DELETE', `/requisitions/${id}`); });
 
   it('สาขาอื่นดู/แก้/ยกเลิกใบของสาขานี้ไม่ได้', async () => {
     assert.equal((await api(t.pktStaff, 'GET', `/requisitions/${id}`)).status, 403);
@@ -119,7 +119,7 @@ describe('อนุมัติ — ต้องมีของ และจอ�
 
 describe('แยกหน้าที่: ผู้อนุมัติ ≠ พนักงานจัดส่ง', () => {
   let id;
-  before(async () => {
+  beforeAll(async () => {
     id = await h.createRequisition(t.cnxStaff, [{ product_id: P.WATER, requested_qty: 10 }]);
   });
   it('พนักงานจัดส่ง / สาขา / ผู้จัดการสาขาย่อย อนุมัติไม่ได้', async () => {
@@ -147,7 +147,7 @@ describe('แยกหน้าที่: ผู้อนุมัติ ≠ พ
   it('พนักงานจัดส่งกดส่งซ้ำพร้อมกัน → ตัดสต๊อกครั้งเดียว', async () => {
     const before = await h.stockOf(P.WATER, B.HQ);
     const rs = await Promise.all([1, 2, 3].map(() => api(t.shipper, 'PUT', `/requisitions/${id}/ship`, { note: 'รถ 1' })));
-    assert.deepEqual(rs.map((r) => r.status).sort(), [200, 400, 400]);
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 400, 400]);
     assert.equal(before - (await h.stockOf(P.WATER, B.HQ)), 10);
   });
   it('คนอื่นนอกจากสาขาเจ้าของ ตรวจรับไม่ได้', async () => {
@@ -162,7 +162,7 @@ describe('แยกหน้าที่: ผู้อนุมัติ ≠ พ
     assert.equal(r.status, 200);
     const done = await h.getRequisition(t.cnxStaff, id);
     assert.equal(done.status, 'completed');
-    assert.deepEqual(done.events.map((e) => e.type), ['created', 'approved', 'shipped', 'received_ok']);
+    expect(done.events.map((e) => e.type)).toEqual(['created', 'approved', 'shipped', 'received_ok']);
     assert.ok((await h.stockOf(P.WATER, B.CNX)) >= 10);
   });
   it('ตรวจรับซ้ำ → 400 สต๊อกไม่เพิ่มซ้ำ', async () => {
@@ -176,7 +176,7 @@ describe('แยกหน้าที่: ผู้อนุมัติ ≠ พ
 
 describe('ตรวจรับ — ข้อมูลผิด', () => {
   let id, item;
-  before(async () => {
+  beforeAll(async () => {
     id = await h.createRequisition(t.pktStaff, [{ product_id: P.WATER, requested_qty: 5 }]);
     await h.approveAll(t, id);
     await api(t.shipper, 'PUT', `/requisitions/${id}/ship`, {});

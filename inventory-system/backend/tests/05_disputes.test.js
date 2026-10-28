@@ -1,16 +1,16 @@
 // ทดสอบ: เคสมีปัญหา — ของชำรุด / ส่งไม่ครบ / ของชดเชย / ปิดเคสต้องตกลงทั้ง 2 ฝ่าย
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B, P } = h;
 
 let t;
-before(async () => {
+beforeAll(async () => {
   t = await h.bootstrap();
   await h.receiveStock(t, P.WATER, 50);
   await h.receiveStock(t, P.PEN, 10);
 });
-after(() => h.stopServer());
+afterAll(() => h.stopServer());
 
 // เดินใบขอเบิกจนสาขาตรวจรับ ตามผลที่กำหนดต่อสินค้า { product_id: [good, bad] }
 async function shippedAndReceived(items, result) {
@@ -28,7 +28,7 @@ async function shippedAndReceived(items, result) {
 
 describe('แจ้งของชำรุด', () => {
   let id;
-  before(async () => { id = await shippedAndReceived([{ product_id: P.WATER, requested_qty: 10 }], { [P.WATER]: [8, 2] }); });
+  beforeAll(async () => { id = await shippedAndReceived([{ product_id: P.WATER, requested_qty: 10 }], { [P.WATER]: [8, 2] }); });
 
   it('ของชำรุดไม่เข้าสต๊อกสาขา เข้าเฉพาะสภาพดี', async () => {
     assert.equal(await h.stockOf(P.WATER, B.CNX), 8);
@@ -63,7 +63,7 @@ describe('แจ้งของชำรุด', () => {
     assert.equal((await api(t.manager, 'PUT', `/requisitions/${id}/replacements/${c.body.id}/ship`, {})).status, 403, 'ผู้อนุมัติส่งเองไม่ได้');
     const before = await h.stockOf(P.WATER, B.HQ);
     const rs = await Promise.all([1, 2].map(() => api(t.shipper, 'PUT', `/requisitions/${id}/replacements/${c.body.id}/ship`, {})));
-    assert.deepEqual(rs.map((r) => r.status).sort(), [200, 400]);
+    expect(rs.map((r) => r.status).sort()).toEqual([200, 400]);
     assert.equal(before - (await h.stockOf(P.WATER, B.HQ)), 2);
     const rep = (await h.getRequisition(t.cnxStaff, id)).replacements[0];
     const r = await api(t.cnxStaff, 'PUT', `/requisitions/${id}/replacements/${c.body.id}/receive`, {
@@ -78,7 +78,7 @@ describe('แจ้งของชำรุด', () => {
 
 describe('สต๊อกไม่พอ → ตกลงปิดเคสร่วมกัน', () => {
   let id, item;
-  before(async () => {
+  beforeAll(async () => {
     id = await shippedAndReceived([{ product_id: P.PEN, requested_qty: 10 }], { [P.PEN]: [7, 3] });
     item = (await h.getRequisition(t.manager, id)).items[0];
   });

@@ -1,4 +1,9 @@
 # Centralized Inventory Management System
+
+> **หมายเหตุ (อัปเดต 29 ต.ค. 2569):** ไฟล์นี้คือ prompt ตั้งต้นของโครงงาน ระบบจริงขยายเกินจากนี้แล้ว
+> (บทบาท `main_manager` + `shipper`, ใบขอเบิก, รายงาน 7 แบบ, เกณฑ์แจ้งเตือนเฉพาะสาขา ฯลฯ)
+> เอกสารที่ตรงกับระบบปัจจุบัน: [README.md](README.md) · [docs/api.md](docs/api.md) · [docs/database.md](docs/database.md) · [docs/design.md](docs/design.md)
+
 ## Prompt สำหรับ Claude Code
 
 ---

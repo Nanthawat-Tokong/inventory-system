@@ -11,6 +11,8 @@
  *   admin@inventory.com   / password123  (admin,        no branch)
  *   manager@inventory.com / password123  (main_manager, branch สาขาหลัก)
  *   staff@inventory.com   / password123  (staff, branch สาขาหลัก)
+ *   shipper@inventory.com / password123  (shipper พนักงานจัดส่ง, สาขาหลัก)
+ *   cnx@inventory.com     / password123  (staff, สาขาเชียงใหม่ — ใช้ลองขอเบิก)
  */
 
 require('dotenv').config();
@@ -25,6 +27,7 @@ async function main() {
 
   const conn = await mysql.createConnection({
     host    : process.env.DB_HOST     || 'localhost',
+    port    : Number(process.env.DB_PORT) || 3306,
     user    : process.env.DB_USER     || 'root',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME     || 'inventory_db',
@@ -79,16 +82,21 @@ async function main() {
     { name: 'Admin',          email: 'admin@inventory.com',   role: 'admin',        branch_id: null         },
     { name: 'ผู้จัดการสาขาหลัก', email: 'manager@inventory.com', role: 'main_manager', branch_id: mainBranchId },
     { name: 'พนักงานสาขาหลัก',  email: 'staff@inventory.com',   role: 'staff', branch_id: mainBranchId },
+    // ครบทุกบทบาทในขั้นตอนใบขอเบิก: สาขาย่อยขอ → ผู้จัดการอนุมัติ → พนักงานจัดส่งส่ง → สาขาย่อยตรวจรับ
+    { name: 'พนักงานจัดส่ง',     email: 'shipper@inventory.com', role: 'shipper', branch_id: mainBranchId },
+    { name: 'พนักงานสาขาเชียงใหม่', email: 'cnx@inventory.com',  role: 'staff', branch_id: branchMap['สาขาเชียงใหม่'] || mainBranchId },
   ];
   for (const u of users) {
     const [r] = await conn.query(
-      `INSERT INTO users (name, email, password_hash, role, branch_id)
-       VALUES (?, ?, ?, ?, ?)
+      // รหัสตัวอย่าง (password123) ใครก็รู้ → บังคับให้เปลี่ยนตอนเข้าใช้ครั้งแรก
+      `INSERT INTO users (name, email, password_hash, role, branch_id, must_change_password)
+       VALUES (?, ?, ?, ?, ?, 1)
        ON DUPLICATE KEY UPDATE
          name          = VALUES(name),
          password_hash = VALUES(password_hash),
          role          = VALUES(role),
-         branch_id     = VALUES(branch_id)`,
+         branch_id     = VALUES(branch_id),
+         must_change_password = 1`,
       [u.name, u.email, hash, u.role, u.branch_id]
     );
     const action = r.affectedRows === 1 ? 'inserted' : r.affectedRows === 2 ? 'updated' : 'unchanged';
@@ -202,7 +210,9 @@ async function main() {
   console.log('\nTest credentials (password: password123)');
   console.log('  admin@inventory.com   – admin');
   console.log('  manager@inventory.com – main_manager');
-  console.log('  staff@inventory.com   – staff');
+  console.log('  staff@inventory.com   – staff (สาขาหลัก)');
+  console.log('  shipper@inventory.com – shipper (พนักงานจัดส่ง)');
+  console.log('  cnx@inventory.com     – staff (สาขาเชียงใหม่)');
 }
 
 main().catch(err => { console.error(err); process.exit(1); });

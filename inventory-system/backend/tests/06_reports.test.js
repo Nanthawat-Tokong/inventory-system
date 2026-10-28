@@ -1,5 +1,5 @@
 // ทดสอบ: รายงาน — ตัวเลขต้องตรงกับสต๊อกจริง และเห็นเฉพาะข้อมูลที่มีสิทธิ์
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B, P } = h;
@@ -10,7 +10,7 @@ const pad = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 const range = `from=${ymd(new Date(today.getTime() - 6 * 86400000))}&to=${ymd(today)}`;
 
-before(async () => {
+beforeAll(async () => {
   t = await h.bootstrap();
   await h.receiveStock(t, P.WATER, 40);
   await h.receiveStock(t, P.SNACK, 4); // ต่ำกว่าเกณฑ์ 10
@@ -22,7 +22,7 @@ before(async () => {
   const d = await h.getRequisition(t.cnxStaff, id);
   await api(t.cnxStaff, 'PUT', `/requisitions/${id}/receive`, { items: [{ item_id: d.items[0].id, received_qty: 9, defective_qty: 1 }] });
 });
-after(() => h.stopServer());
+afterAll(() => h.stopServer());
 
 describe('ภาพรวม', () => {
   it('ยอดรับเข้า/ออกตรงกับรายการจริง', async () => {
@@ -108,7 +108,7 @@ describe('สิทธิ์การดูรายงาน', () => {
 
 describe('การเบิกรายคน', () => {
   let waitingId;
-  before(async () => {
+  beforeAll(async () => {
     // ใบที่ 2 ของพนักงานเชียงใหม่: อนุมัติแล้วแต่ยังไม่ส่ง → "รอ" 3 ชิ้น
     waitingId = await h.createRequisition(t.cnxStaff, [{ product_id: P.WATER, requested_qty: 3 }]);
     await h.approveAll(t, waitingId);

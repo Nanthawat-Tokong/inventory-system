@@ -1,12 +1,12 @@
 // ทดสอบ: ล็อกอิน / token / สิทธิ์ที่อัปเดตทันที / จัดการผู้ใช้
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B } = h;
 
 let t;
-before(async () => { t = await h.bootstrap(); });
-after(() => h.stopServer());
+beforeAll(async () => { t = await h.bootstrap(); });
+afterAll(() => h.stopServer());
 
 describe('ล็อกอิน', () => {
   it('รหัสถูก → ได้ token และข้อมูลผู้ใช้ (ไม่มี password_hash)', async () => {

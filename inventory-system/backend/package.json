@@ -8,8 +8,9 @@
     "dev": "nodemon src/server.js",
     "seed": "node seed.js",
     "seed:users": "node seed.js --users-only",
-    "test": "node --test --test-concurrency=1 \"tests/*.test.js\"",
-    "backup": "node scripts/backup-db.js"
+    "test": "jest --runInBand",
+    "backup": "node scripts/backup-db.js",
+    "test:load": "node tests/load/load-test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -20,6 +21,19 @@
     "mysql2": "^3.9.8"
   },
   "devDependencies": {
+    "jest": "^29.7.0",
     "nodemon": "^3.1.4"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "verbose": true,
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/load/"
+    ]
   }
 }

@@ -1,0 +1,12 @@
+{
+  "name": "centralized-inventory-management-system",
+  "private": true,
+  "description": "ใช้สำหรับ deploy เป็นบริการเดียว (เช่น Railway): build หน้าเว็บ แล้วให้ backend เสิร์ฟทั้ง API และหน้าเว็บ — ตอนพัฒนาให้รันใน inventory-system/backend และ inventory-system/frontend ตามปกติ",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm --prefix inventory-system/frontend ci --include=dev && npm --prefix inventory-system/frontend run build && npm --prefix inventory-system/backend ci --omit=dev",
+    "start": "node inventory-system/backend/src/server.js"
+  }
+}

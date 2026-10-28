@@ -1,15 +1,15 @@
 // ทดสอบ: เปลี่ยนรหัสผ่านเอง / ยกเลิกหลังอนุมัติ / จัดการของชำรุด (ตัดทิ้ง-ส่งคืน)
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B, P } = h;
 
 let t;
-before(async () => {
+beforeAll(async () => {
   t = await h.bootstrap();
   await h.receiveStock(t, P.WATER, 50);
 });
-after(() => h.stopServer());
+afterAll(() => h.stopServer());
 
 describe('เปลี่ยนรหัสผ่าน', () => {
   it('บัญชีที่ admin สร้าง ต้องเปลี่ยนรหัสก่อนใช้งาน — ทำอย่างอื่นไม่ได้จนกว่าจะเปลี่ยน', async () => {
@@ -45,7 +45,7 @@ describe('เปลี่ยนรหัสผ่าน', () => {
 
 describe('ยกเลิกหลังอนุมัติ', () => {
   let id;
-  before(async () => {
+  beforeAll(async () => {
     id = await h.createRequisition(t.cnxStaff, [{ product_id: P.WATER, requested_qty: 30 }]);
     await h.approveAll(t, id);
   });
@@ -83,7 +83,7 @@ describe('ยกเลิกหลังอนุมัติ', () => {
 
 describe('ของชำรุด: ตัดทิ้ง / ส่งคืนคลังหลัก', () => {
   let id, item;
-  before(async () => {
+  beforeAll(async () => {
     id = await h.createRequisition(t.pktStaff, [{ product_id: P.WATER, requested_qty: 10 }]);
     await h.approveAll(t, id);
     await api(t.shipper, 'PUT', `/requisitions/${id}/ship`, {});
@@ -93,7 +93,7 @@ describe('ของชำรุด: ตัดทิ้ง / ส่งคืน�
   it('รายละเอียดใบบอกว่ามีของชำรุด 4 ชิ้นที่ยังไม่ได้ตัดสินใจ', async () => {
     const d = await h.getRequisition(t.manager, id);
     assert.equal(d.items[0].defect_undecided, 4);
-    assert.deepEqual(d.defects, []);
+    expect(d.defects).toEqual([]);
   });
   it('เกินจำนวนชำรุด / action แปลก / ไม่ใช่ผู้อนุมัติ → ไม่ได้', async () => {
     assert.equal((await api(t.manager, 'POST', `/requisitions/${id}/defects`, { items: [{ requisition_item_id: item.id, qty: 5, action: 'write_off' }] })).status, 400);
@@ -108,7 +108,7 @@ describe('ของชำรุด: ตัดทิ้ง / ส่งคืน�
     assert.equal(r.status, 201);
     const d = await h.getRequisition(t.manager, id);
     assert.equal(d.items[0].defect_undecided, 0);
-    assert.deepEqual(d.defects.map((x) => [x.action, x.status, x.qty]), [['write_off', 'done', 1], ['return', 'pending', 3]]);
+    expect(d.defects.map((x) => [x.action, x.status, x.qty])).toEqual([['write_off', 'done', 1], ['return', 'pending', 3]]);
     assert.equal((await api(t.manager, 'POST', `/requisitions/${id}/defects`, { items: [{ requisition_item_id: item.id, qty: 1, action: 'write_off' }] })).status, 400, 'ตัดสินใจครบแล้ว เพิ่มไม่ได้');
   });
   it('ของชำรุดไม่กระทบยอดสต๊อกใคร (สาขาได้แค่ 6 ชิ้นที่ดี)', async () => {

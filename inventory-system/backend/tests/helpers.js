@@ -5,7 +5,7 @@
 //   1. สร้างฐานข้อมูลทดสอบใหม่ (inventory_db_test) จาก schema.sql — ไม่แตะฐานข้อมูลจริง
 //   2. ใส่ข้อมูลตั้งต้นชุดเดียวกันทุกครั้ง (สาขา / ผู้ใช้ทุกบทบาท / สินค้า)
 //   3. เปิด backend จริงที่ port 5099 ชี้ไปที่ฐานข้อมูลทดสอบ แล้วยิง HTTP เหมือนหน้าเว็บ
-// รัน: npm test
+// รัน: npm test  (Jest — ทีละไฟล์ด้วย --runInBand เพราะทุกไฟล์ใช้ฐานข้อมูลทดสอบ/port เดียวกัน)
 // ============================================================
 
 const fs = require('fs');
@@ -22,6 +22,7 @@ const PASSWORD = 'password123';
 
 const conn = () => mysql.createConnection({
   host: process.env.DB_HOST || 'localhost',
+  port: Number(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER || 'root',
   password: process.env.DB_PASSWORD || '',
   charset: 'utf8mb4',

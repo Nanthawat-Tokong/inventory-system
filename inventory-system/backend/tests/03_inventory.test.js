@@ -1,12 +1,12 @@
 // ทดสอบ: รับเข้า / ออกสินค้า / ดูสต๊อก / ประวัติ
-const { describe, it, before, after } = require('node:test');
+// ใช้ Jest (describe / it / beforeAll / afterAll เป็นตัวแปรส่วนกลางของ Jest)
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { api, B, P } = h;
 
 let t;
-before(async () => { t = await h.bootstrap(); });
-after(() => h.stopServer());
+beforeAll(async () => { t = await h.bootstrap(); });
+afterAll(() => h.stopServer());
 
 describe('รับสินค้าเข้า', () => {
   it('รับเข้าคลังหลักได้ และ stock_after ถูกต้อง', async () => {
@@ -59,14 +59,14 @@ describe('ออกสินค้า', () => {
   it('ออกพร้อมกัน 2 คำสั่งเกินสต๊อก → สำเร็จแค่ 1 สต๊อกไม่ติดลบ', async () => {
     const results = await Promise.all([1, 2].map(() =>
       api(t.manager, 'POST', '/inventory/issue', { product_id: P.WATER, branch_id: B.HQ, quantity: 50 })));
-    assert.deepEqual(results.map((r) => r.status).sort(), [201, 400]);
+    expect(results.map((r) => r.status).sort()).toEqual([201, 400]);
     assert.equal(await h.stockOf(P.WATER, B.HQ), 20);
   });
   it('รับเข้าพร้อมกัน 5 คำสั่ง → stock_after ไม่ซ้ำกันและยอดรวมถูก', async () => {
     const rs = await Promise.all([1, 2, 3, 4, 5].map(() =>
       api(t.manager, 'POST', '/inventory/receive', { product_id: P.PEN, branch_id: B.HQ, quantity: 10 })));
     assert.ok(rs.every((r) => r.status === 201));
-    assert.deepEqual(rs.map((r) => r.body.stock_after).sort((a, b) => a - b), [10, 20, 30, 40, 50]);
+    expect(rs.map((r) => r.body.stock_after).sort((a, b) => a - b)).toEqual([10, 20, 30, 40, 50]);
   });
 });
 
