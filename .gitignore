@@ -1,0 +1,28 @@
+# ไลบรารีที่ติดตั้งด้วย npm install (สร้างใหม่ได้)
+node_modules/
+
+# ไฟล์ build ของหน้าเว็บ (สร้างใหม่ได้ด้วย npm run build)
+dist/
+dist-ssr/
+
+# รหัสผ่านฐานข้อมูล / รหัสลับของระบบ — ห้ามขึ้น git เด็ดขาด (ใช้ .env.example เป็นตัวอย่าง)
+.env
+.env.*
+!.env.example
+
+# ไฟล์สำรองฐานข้อมูล — มีข้อมูลจริงและรหัสผ่าน (hash) ของผู้ใช้ เก็บไว้ในเครื่อง/ที่ปลอดภัยเท่านั้น
+inventory-system/backend/backups/
+inventory-system/backend/backup_*.sql
+inventory-system/backend/backup_*.json
+
+# log / ไฟล์ชั่วคราว
+*.log
+logs/
+.DS_Store
+Thumbs.db
+
+# ตั้งค่าเฉพาะเครื่อง
+.claude/settings.local.json
+.vscode/*
+!.vscode/extensions.json
+.idea/
