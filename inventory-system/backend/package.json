@@ -8,7 +8,8 @@
     "dev": "nodemon src/server.js",
     "seed": "node seed.js",
     "seed:users": "node seed.js --users-only",
-    "test": "node --test --test-concurrency=1 \"tests/*.test.js\""
+    "test": "node --test --test-concurrency=1 \"tests/*.test.js\"",
+    "backup": "node scripts/backup-db.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
