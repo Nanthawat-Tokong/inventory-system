@@ -104,3 +104,4 @@ schtasks /Create /TN "InventoryDB Backup" /SC DAILY /ST 21:00 /F /TR "\"<path>\i
 | [docs/testing.md](docs/testing.md) | การทดสอบ และผลทดสอบ |
 | [docs/uat-questionnaire.md](docs/uat-questionnaire.md) | แบบสอบถามความพึงพอใจผู้ใช้ (UAT) |
 | [docs/deploy-railway.md](docs/deploy-railway.md) | วิธีนำขึ้นเซิร์ฟเวอร์ Railway |
+"# inventory-system" 
