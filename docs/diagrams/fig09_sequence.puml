@@ -1,0 +1,53 @@
+@startuml fig09_sequence
+!include _style.iuml
+autonumber
+actor "พนักงานสาขา" as Staff
+participant "React\nFrontend" as FE
+participant "authMiddleware /\nroleMiddleware" as MW
+participant "requisition\nController" as C
+database "MySQL /\nMariaDB" as DB
+actor "ผู้อนุมัติ" as Appr
+actor "พนักงานจัดส่ง" as Ship
+
+Staff -> FE : กรอกฟอร์มใบขอเบิก
+FE -> MW : POST /api/requisitions (Bearer JWT)
+MW -> DB : อ่านบทบาทและสาขาล่าสุด
+MW -> C : create()
+C -> DB : BEGIN; ตรวจจำนวนเบิกได้;\nINSERT requisitions, requisition_items; COMMIT
+C --> FE : 201 Created (pending)
+
+Appr -> FE : อนุมัติใบขอเบิก
+FE -> MW : PUT /api/requisitions/:id/approve
+MW -> C : approve() (requireWarehouseAuthority)
+C -> DB : UPDATE approved_qty, status = approved;\nINSERT shipments (preparing)
+
+Ship -> FE : กดจัดส่ง
+FE -> MW : PUT /api/requisitions/:id/ship
+MW -> C : ship() (requireShipper)
+C -> DB : BEGIN; SELECT … FOR UPDATE;\nUPDATE shipped_qty; INSERT transactions (issue);\nstatus = shipped; COMMIT
+
+Staff -> FE : ยืนยันรับสินค้า (ดี / ชำรุด)
+FE -> MW : PUT /api/requisitions/:id/receive
+MW -> C : receive() (ตรวจสาขาปลายทาง)
+C -> DB : BEGIN; UPDATE received_qty, defective_qty;\nINSERT transactions (receive);\nstatus = completed หรือ disputed; COMMIT
+C --> FE : 200 OK
+
+== กรณีพบปัญหา (disputed) ==
+Appr -> FE : ตัดสินของชำรุด / สร้างรายการชดเชย
+FE -> C : POST /:id/defects, POST /:id/replacements
+C -> DB : INSERT defect_records;\nINSERT replacement_shipments (preparing)
+Ship -> FE : จัดส่งของชดเชย
+FE -> C : PUT /:id/replacements/:rid/ship
+C -> DB : BEGIN; INSERT transactions (issue);\nstatus = shipped; COMMIT
+Staff -> FE : ยืนยันรับของชดเชย
+FE -> C : PUT /:id/replacements/:rid/receive
+C -> DB : BEGIN; INSERT transactions (receive);\nสะสม received_qty; ครบแล้ว → completed; COMMIT
+alt ไม่ส่งชดเชย
+  Appr -> FE : ขอปิดเคส
+  FE -> C : PUT /:id/propose-close
+  C -> DB : dispute_state = close_proposed
+  Staff -> FE : ยืนยันปิดเคส
+  FE -> C : PUT /:id/accept-close
+  C -> DB : status = completed
+end
+@enduml

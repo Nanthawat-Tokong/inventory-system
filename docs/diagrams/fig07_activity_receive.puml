@@ -1,0 +1,29 @@
+@startuml fig07_activity_receive
+!include _style.iuml
+|พนักงานสาขา|
+start
+:เปิดใบขอเบิกสถานะ "จัดส่งแล้ว รอรับสินค้า";
+:ตรวจนับ กรอกจำนวนสภาพดีและชำรุด\nของแต่ละรายการ;
+:กด "ยืนยันรับสินค้า";
+|ระบบ|
+if (ผู้ใช้อยู่สาขาเดียวกับใบขอเบิก?) then (ใช่)
+  if (ดี + ชำรุด ≤ shipped_qty?) then (ใช่)
+    :BEGIN TRANSACTION;
+    :บันทึก received_qty, defective_qty;
+    :บันทึก transactions ประเภท receive\nเฉพาะของสภาพดี ที่สาขาปลายทาง;
+    if (ได้รับสภาพดีครบตามที่อนุมัติ?) then (ใช่)
+      :shipments = received_ok\nสถานะ completed;
+    else (ไม่ใช่)
+      :shipments = received_issue\nสถานะ disputed (awaiting_response)\nแจ้งคลังหลัก;
+    endif
+    :COMMIT;
+    stop
+  else (ไม่ใช่)
+    :แจ้งจำนวนไม่ถูกต้อง (400);
+    stop
+  endif
+else (ไม่ใช่)
+  :ปฏิเสธคำขอ (403);
+  stop
+endif
+@enduml

@@ -1,0 +1,166 @@
+@startuml fig11_er
+!include _style.iuml
+!pragma layout smetana
+hide circle
+entity branches {
+  * id : INT <<PK>>
+  --
+  name : VARCHAR(100)
+  location : VARCHAR(255)
+  is_warehouse : TINYINT(1)
+  is_deleted : TINYINT(1)
+  created_at : TIMESTAMP
+}
+entity users {
+  * id : INT <<PK>>
+  --
+  name : VARCHAR(100)
+  email : VARCHAR(100) <<UQ>>
+  password_hash : VARCHAR(255)
+  must_change_password : TINYINT(1)
+  role : ENUM(4 บทบาท)
+  branch_id : INT <<FK>>
+  created_at : TIMESTAMP
+}
+entity products {
+  * id : INT <<PK>>
+  --
+  name : VARCHAR(200)
+  sku : VARCHAR(50) <<UQ>>
+  category : VARCHAR(100)
+  unit : VARCHAR(50)
+  low_stock_threshold : INT
+  is_deleted : TINYINT(1)
+  created_at : TIMESTAMP
+}
+entity transactions {
+  * id : INT <<PK>>
+  --
+  product_id : INT <<FK>>
+  branch_id : INT <<FK>>
+  user_id : INT <<FK>>
+  type : ENUM(receive, issue)
+  quantity : INT
+  stock_after : INT
+  note : TEXT
+  created_at : TIMESTAMP
+}
+entity alerts {
+  * id : INT <<PK>>
+  --
+  product_id : INT <<FK>>
+  branch_id : INT <<FK>>
+  min_quantity : INT
+  is_active : BOOLEAN
+  created_at : TIMESTAMP
+}
+entity branch_products {
+  * id : INT <<PK>>
+  --
+  branch_id : INT <<FK>>
+  product_id : INT <<FK>>
+  is_active : TINYINT(1)
+}
+entity requisitions {
+  * id : INT <<PK>>
+  --
+  branch_id : INT <<FK>>
+  status : ENUM(6 สถานะ)
+  dispute_state : ENUM(4 สถานะ)
+  created_by : INT <<FK>>
+  note : TEXT
+  reject_reason : TEXT
+  approved_by : INT <<FK>>
+  approved_at : TIMESTAMP
+  created_at : TIMESTAMP
+  updated_at : TIMESTAMP
+}
+entity requisition_items {
+  * id : INT <<PK>>
+  --
+  requisition_id : INT <<FK>>
+  product_id : INT <<FK>>
+  requested_qty : INT
+  approved_qty : INT
+  shipped_qty : INT
+  received_qty : INT
+  defective_qty : INT
+}
+entity shipments {
+  * id : INT <<PK>>
+  --
+  requisition_id : INT <<FK>>
+  status : ENUM(4 สถานะ)
+  shipped_at : TIMESTAMP
+  received_at : TIMESTAMP
+  shipped_by : INT <<FK>>
+  received_by : INT <<FK>>
+  note : TEXT
+  issue_note : TEXT
+}
+entity replacement_shipments {
+  * id : INT <<PK>>
+  --
+  requisition_id : INT <<FK>>
+  status : ENUM(3 สถานะ)
+  note : TEXT
+  created_by : INT <<FK>>
+  created_at : TIMESTAMP
+  shipped_at : TIMESTAMP
+  shipped_by : INT <<FK>>
+  received_at : TIMESTAMP
+  received_by : INT <<FK>>
+}
+entity replacement_shipment_items {
+  * id : INT <<PK>>
+  --
+  replacement_shipment_id : INT <<FK>>
+  requisition_item_id : INT <<FK>>
+  product_id : INT <<FK>>
+  replacement_qty : INT
+  received_qty : INT
+}
+entity requisition_events {
+  * id : INT <<PK>>
+  --
+  requisition_id : INT <<FK>>
+  user_id : INT <<FK>>
+  type : VARCHAR(40)
+  message : TEXT
+  created_at : TIMESTAMP
+}
+entity defect_records {
+  * id : INT <<PK>>
+  --
+  requisition_id : INT <<FK>>
+  requisition_item_id : INT <<FK>>
+  product_id : INT <<FK>>
+  branch_id : INT <<FK>>
+  qty : INT
+  action : ENUM(write_off, return)
+  status : ENUM(pending, done)
+  note : TEXT
+  created_by : INT <<FK>>
+  created_at : TIMESTAMP
+  done_by : INT <<FK>>
+  done_at : TIMESTAMP
+}
+branches ||--o{ users
+branches ||--o{ transactions
+products ||--o{ transactions
+users ||--o{ transactions
+branches ||--o{ alerts
+products ||--o{ alerts
+branches ||--o{ branch_products
+products ||--o{ branch_products
+branches ||--o{ requisitions
+users ||--o{ requisitions
+requisitions ||--|{ requisition_items
+products ||--o{ requisition_items
+requisitions ||--o| shipments
+requisitions ||--o{ replacement_shipments
+replacement_shipments ||--|{ replacement_shipment_items
+requisition_items ||--o{ replacement_shipment_items
+requisitions ||--o{ requisition_events
+requisition_items ||--o{ defect_records
+@enduml

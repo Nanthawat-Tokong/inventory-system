@@ -1,0 +1,26 @@
+@startuml fig01_architecture
+!include _style.iuml
+!pragma layout smetana
+left to right direction
+actor "ผู้ดูแลระบบ" as A
+actor "ผู้จัดการคลังหลัก /\nผู้จัดการสาขารอง" as M
+actor "พนักงานสาขา" as S
+actor "พนักงานจัดส่ง" as P
+node "เว็บเบราว์เซอร์ / มือถือ" {
+  [Frontend\nReact + Tailwind CSS\nProtectedRoute ตามบทบาท] as FE
+}
+node "เซิร์ฟเวอร์กลาง (เครื่องเดียว / Railway)" {
+  [Middleware\nตรวจ JWT + อ่านสิทธิ์จากฐานข้อมูล\nทุกคำขอ] as MW
+  [Backend\nNode.js + Express\nRESTful API] as BE
+  database "MySQL / MariaDB\ninventory_db\n(ฐานข้อมูลกลางทุกสาขา)" as DB
+}
+[สำรองข้อมูลรายวัน\nmysqldump 21:00] as BK
+A --> FE
+M --> FE
+S --> FE
+P --> FE
+FE --> MW : HTTPS + JSON\n(Bearer JWT)
+MW --> BE
+BE --> DB : SQL (mysql2)\nทรานแซกชัน + ล็อกแถว
+BK ..> DB
+@enduml

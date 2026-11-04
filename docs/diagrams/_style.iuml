@@ -1,0 +1,13 @@
+skinparam defaultFontName Tahoma
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam ArrowColor #333333
+skinparam ActivityBackgroundColor #FFFFFF
+skinparam ActivityBorderColor #555555
+skinparam SwimlaneTitleFontStyle bold
+skinparam ClassBackgroundColor #FFFFFF
+skinparam ClassBorderColor #555555
+skinparam UsecaseBackgroundColor #FFFFFF
+skinparam UsecaseBorderColor #555555
+skinparam ParticipantBackgroundColor #FFFFFF
+skinparam DatabaseBackgroundColor #FFFFFF

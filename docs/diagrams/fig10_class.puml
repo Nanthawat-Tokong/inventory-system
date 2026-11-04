@@ -1,0 +1,115 @@
+@startuml fig10_class
+!include _style.iuml
+!pragma layout smetana
+hide circle
+class Branch {
+  +id : int
+  +name : string
+  +location : string
+  +is_warehouse : bool
+  +is_deleted : bool
+}
+class User {
+  +id : int
+  +name : string
+  +email : string
+  -password_hash : string
+  +must_change_password : bool
+  +role : string
+  +login()
+  +changePassword()
+}
+class Product {
+  +id : int
+  +sku : string
+  +name : string
+  +category : string
+  +unit : string
+  +low_stock_threshold : int
+  +is_deleted : bool
+  +create()
+  +update()
+  +softDelete()
+}
+class Transaction {
+  +id : int
+  +type : string
+  +quantity : int
+  +stock_after : int
+  +note : string
+}
+class BranchProduct {
+  +is_active : bool
+  +updateMappings()
+}
+class Alert {
+  +min_quantity : int
+  +is_active : bool
+}
+class Requisition {
+  +id : int
+  +status : string
+  +dispute_state : string
+  +note : string
+  +reject_reason : string
+  +create()
+  +update()
+  +approve()
+  +reject()
+  +cancelApproval()
+  +ship()
+  +receive()
+  +respond()
+  +proposeClose()
+  +acceptClose()
+}
+class RequisitionItem {
+  +requested_qty : int
+  +approved_qty : int
+  +shipped_qty : int
+  +received_qty : int
+  +defective_qty : int
+}
+class Shipment {
+  +status : string
+  +shipped_at : datetime
+  +received_at : datetime
+  +issue_note : string
+}
+class ReplacementShipment {
+  +status : string
+  +ship()
+  +receive()
+}
+class ReplacementShipmentItem {
+  +replacement_qty : int
+  +received_qty : int
+}
+class RequisitionEvent {
+  +type : string
+  +message : string
+  +created_at : datetime
+}
+class DefectRecord {
+  +qty : int
+  +action : string
+  +status : string
+}
+Branch "1" -- "0..*" User
+Branch "1" -- "0..*" Transaction
+Product "1" -- "0..*" Transaction
+User "1" -- "0..*" Transaction
+Branch "1" -- "0..*" BranchProduct
+Product "1" -- "0..*" BranchProduct
+Branch "1" -- "0..*" Alert
+Product "1" -- "0..*" Alert
+Branch "1" -- "0..*" Requisition
+Requisition "1" *-- "1..*" RequisitionItem
+Product "1" -- "0..*" RequisitionItem
+Requisition "1" -- "0..1" Shipment
+Requisition "1" *-- "0..*" ReplacementShipment
+ReplacementShipment "1" *-- "1..*" ReplacementShipmentItem
+RequisitionItem "1" -- "0..*" ReplacementShipmentItem
+Requisition "1" *-- "0..*" RequisitionEvent
+RequisitionItem "1" -- "0..*" DefectRecord
+@enduml

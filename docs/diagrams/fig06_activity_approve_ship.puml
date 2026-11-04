@@ -1,0 +1,39 @@
+@startuml fig06_activity_approve_ship
+!include _style.iuml
+|ผู้อนุมัติ (Admin / ผู้จัดการคลังหลัก)|
+start
+:เปิดใบขอเบิกสถานะ "รออนุมัติ";
+if (อนุมัติ?) then (อนุมัติ)
+  :ระบุจำนวนที่อนุมัติของแต่ละรายการ;
+  |ระบบ|
+  if (0 ≤ จำนวน ≤ จำนวนที่ขอ\nและไม่เกินจำนวนเบิกได้?) then (ใช่)
+    :บันทึก approved_qty, approved_by, approved_at\nสถานะ approved (จองสินค้า)\nสร้าง shipments (preparing);
+  else (ไม่ใช่)
+    :แจ้งข้อผิดพลาด (400);
+    stop
+  endif
+else (ปฏิเสธ)
+  :ระบุเหตุผล;
+  |ระบบ|
+  :สถานะ rejected และบันทึก reject_reason;
+  stop
+endif
+|พนักงานจัดส่ง|
+:กดปุ่ม "จัดส่งสินค้า";
+|ระบบ|
+if (ผู้ใช้เป็น shipper ของคลังหลัก?) then (ใช่)
+  :BEGIN TRANSACTION;
+  repeat
+    :ล็อกแถวและคำนวณสต๊อกคลังหลัก\n(SELECT … FOR UPDATE);
+    :shipped_qty = min(approved_qty, สต๊อกคงเหลือ);
+    :บันทึก transactions ประเภท issue ที่คลังหลัก;
+  repeat while (ยังมีรายการ?) is (ใช่)
+  ->ไม่;
+  :บันทึกหมายเหตุรายการที่ส่งไม่ครบ\nshipments = shipped, สถานะ shipped;
+  :COMMIT;
+  stop
+else (ไม่ใช่)
+  :ปฏิเสธคำขอ (403);
+  stop
+endif
+@enduml
